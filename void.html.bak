@@ -5,23 +5,21 @@
 <title>VOID · LAITON ecosystem</title>
 <style>
 *{margin:0;padding:0}
-body{background:#a0a5b1;overflow:hidden;font-family:'IBM Plex Mono',monospace;cursor:default}
+body{background:#0a0a0f;overflow:hidden;font-family:monospace;cursor:default}
 canvas{display:block}
 #ui{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none}
-#hud{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(0,0,0,.06);font-size:8px;letter-spacing:2px;z-index:2;text-align:center;font-family:'IBM Plex Mono',monospace}
-#hud .r{color:rgba(0,0,0,.25);font-size:9px;letter-spacing:4px;margin-bottom:4px;text-transform:uppercase}
-#hud .s{color:rgba(0,0,0,.04);font-size:7px;letter-spacing:1px}
-#secret{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);z-index:3;text-align:center;opacity:0;transition:opacity .6s;pointer-events:none;font-family:'IBM Plex Mono',monospace}
+#hud{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.04);font-size:8px;letter-spacing:2px;z-index:2;text-align:center;font-family:monospace}
+#hud .r{color:#00d4aa;font-size:9px;letter-spacing:4px;margin-bottom:4px;text-transform:uppercase}
+#hud .s{color:rgba(255,255,255,.02);font-size:7px;letter-spacing:1px}
+#secret{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);z-index:3;text-align:center;opacity:0;transition:opacity .6s;pointer-events:none;font-family:monospace}
 #secret.s{opacity:1}
-#secret .t{color:#000;font-size:11px;letter-spacing:2px;margin-bottom:4px}
-#secret .h{color:rgba(0,0,0,.25);font-size:8px;letter-spacing:3px;text-transform:uppercase}
+#secret .t{color:#fff;font-size:11px;letter-spacing:2px;margin-bottom:4px;text-shadow:0 0 20px rgba(0,212,170,.15)}
+#secret .h{color:rgba(0,212,170,.2);font-size:8px;letter-spacing:3px;text-transform:uppercase}
 #nav{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:2;display:flex;gap:3px;pointer-events:auto}
-#nav button{background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.06);color:rgba(0,0,0,.12);font-family:'IBM Plex Mono',monospace;font-size:6px;letter-spacing:2px;padding:4px 8px;border-radius:2px;cursor:pointer;transition:.3s;text-transform:uppercase}
-#nav button:hover{background:rgba(0,0,0,.06);color:rgba(0,0,0,.25)}
-#nav button.a{border-color:rgba(0,0,0,.18);color:rgba(0,0,0,.35);background:rgba(0,0,0,.04)}
-#music-btn{position:fixed;top:16px;right:16px;z-index:2;font-family:'IBM Plex Mono',monospace;font-size:6px;color:rgba(0,0,0,.12);background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.06);padding:4px 8px;border-radius:2px;cursor:pointer;pointer-events:auto;letter-spacing:2px;text-transform:uppercase;transition:.3s}
-#music-btn:hover{border-color:rgba(0,0,0,.12);color:rgba(0,0,0,.25)}
-#stats{position:fixed;top:16px;right:48px;z-index:2;color:rgba(0,0,0,.04);font-size:7px;letter-spacing:1px;text-align:right;line-height:1.6;font-family:'IBM Plex Mono',monospace;pointer-events:none}
+#nav button{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.08);font-family:monospace;font-size:6px;letter-spacing:2px;padding:4px 8px;border-radius:2px;cursor:pointer;transition:.3s;text-transform:uppercase}
+#nav button:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.2)}
+#nav button.a{border-color:rgba(0,212,170,.15);color:rgba(0,212,170,.3);background:rgba(0,212,170,.03)}
+#stats{position:fixed;top:16px;right:16px;z-index:2;color:rgba(255,255,255,.03);font-size:7px;letter-spacing:1px;text-align:right;line-height:1.6;font-family:monospace;pointer-events:none}
 </style>
 </head>
 <body>
@@ -39,7 +37,6 @@ canvas{display:block}
     <button data-r="echo">ECHO</button>
     <button data-r="singularity">SINGULARITY</button>
   </div>
-  <button id="music-btn">♪ music</button>
   <div id="stats"><span id="fps">0</span> FPS · <span id="obj-count">0</span> objects</div>
   <div id="hud"><div class="r" id="room-name">VOID</div><div class="s" id="room-desc">the empty space between</div></div>
   <div id="secret"><div class="t" id="st"></div><div class="h" id="sh"></div></div>
@@ -47,7 +44,7 @@ canvas{display:block}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 const scene=new THREE.Scene(),renderer=new THREE.WebGLRenderer({antialias:true})
-renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0xa0a5b1);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0x0a0a0f);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap
 document.body.prepend(renderer.domElement)
 const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,1000);camera.position.z=10
 const world=new THREE.Group();scene.add(world)
@@ -255,16 +252,6 @@ for(let i=0;i<8;i++){
   const m=new THREE.Mesh(new THREE.CylinderGeometry(.005,.05,15,3),new THREE.MeshBasicMaterial({color:0x00d4aa,transparent:true,opacity:.005,depthWrite:false}))
   const a=(i/8)*Math.PI*2;m.position.set(Math.cos(a)*4,0,Math.sin(a)*4);m.rotation.x=Math.random()*.1;world.add(m)
 }
-
-// ─── Music ───
-const vaudio=new Audio('https://raw.githubusercontent.com/Laiton-Group/hub/main/shiveria.mp3')
-vaudio.loop=true;vaudio.volume=.15
-let vmusic=false
-document.getElementById('music-btn').addEventListener('click',()=>{
-  vmusic=!vmusic
-  if(vmusic){vaudio.play().catch(()=>{});document.getElementById('music-btn').textContent='♪ on'}
-  else{vaudio.pause();document.getElementById('music-btn').textContent='♪ music'}
-})
 
 // ─── Navigation ───
 const roomKeys=Object.keys(rooms),roomNames={void:'VOID',crystal:'CRYSTAL GARDEN',ember:'EMBER',depths:'DEPTHS',aurora:'AURORA',pillars:'PILLARS',abyss:'ABYSS',nexus:'NEXUS',echo:'ECHO',singularity:'SINGULARITY'}
