@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>void · laiton</title>
+<style>
+*{margin:0;padding:0}
+body{background:#0a0a0f;overflow:hidden;font-family:monospace}
+canvas{display:block}
+#info{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);color:#333;font-size:11px;letter-spacing:3px;z-index:1;text-transform:uppercase;pointer-events:none}
+#info span{color:#00d4aa}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info"><span>✦</span> move mouse · scroll to zoom</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const scene=new THREE.Scene()
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,1000)
+const renderer=new THREE.WebGLRenderer({antialias:true})
+renderer.setSize(innerWidth,innerHeight)
+renderer.setPixelRatio(Math.min(devicePixelRatio,2))
+renderer.setClearColor(0x0a0a0f)
+document.body.prepend(renderer.domElement)
+
+// Floating geometry
+const group=new THREE.Group()
+const colors=[0x00d4aa,0x7c4dff,0xff00aa,0x00aaff,0xffaa00]
+
+// Create various geometric shapes
+for(let i=0;i<60;i++){
+  let geo
+  const type=Math.floor(Math.random()*4)
+  if(type===0)geo=new THREE.IcosahedronGeometry(.3+Math.random()*.5,0)
+  else if(type===1)geo=new THREE.OctahedronGeometry(.3+Math.random()*.5)
+  else if(type===2)geo=new THREE.TorusGeometry(.2+Math.random()*.4,.08+Math.random()*.15,6,8)
+  else geo=new THREE.TetrahedronGeometry(.3+Math.random()*.5)
+  
+  const mat=new THREE.MeshStandardMaterial({
+    color:colors[Math.floor(Math.random()*colors.length)],
+    wireframe:Math.random()>.5,
+    metalness:.3,roughness:.7,
+    transparent:true,opacity:.6+Math.random()*.4,
+    emissive:colors[Math.floor(Math.random()*colors.length)],
+    emissiveIntensity:.05+Math.random()*.1
+  })
+  const mesh=new THREE.Mesh(geo,mat)
+  const theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1)
+  const r=2+Math.random()*6
+  mesh.position.set(Math.sin(phi)*Math.cos(theta)*r,Math.sin(phi)*Math.sin(theta)*r,Math.cos(phi)*r)
+  mesh.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6)
+  mesh.userData={vx:(Math.random()-.5)*.005,vy:(Math.random()-.5)*.005,vz:(Math.random()-.5)*.005,rot:Math.random()*.02-.01}
+  group.add(mesh)
+}
+scene.add(group)
+
+// Ambient particles (tiny dots)
+const pCount=2000,pPos=new Float32Array(pCount*3),pSizes=new Float32Array(pCount)
+for(let i=0;i<pCount;i++){
+  const r=10+Math.random()*30
+  const theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1)
+  pPos[i*3]=Math.sin(phi)*Math.cos(theta)*r
+  pPos[i*3+1]=Math.sin(phi)*Math.sin(theta)*r
+  pPos[i*3+2]=Math.cos(phi)*r
+  pSizes[i]=.5+Math.random()*1.5
+}
+const pGeo=new THREE.BufferGeometry()
+pGeo.setAttribute('position',new THREE.BufferAttribute(pPos,3))
+const pMat=new THREE.PointsMaterial({color:0x444466,size:.04,transparent:true,opacity:.4,blending:THREE.AdditiveBlending})
+const particles=new THREE.Points(pGeo,pMat)
+scene.add(particles)
+
+// Lighting
+const amb=new THREE.AmbientLight(0x222244,.5)
+scene.add(amb)
+const dir=new THREE.DirectionalLight(0x00d4aa,.8)
+dir.position.set(5,10,5)
+scene.add(dir)
+const dir2=new THREE.DirectionalLight(0x7c4dff,.4)
+dir2.position.set(-5,-5,5)
+scene.add(dir2)
+
+camera.position.z=8
+
+let mx=0,my=0,targetZ=8
+document.addEventListener('mousemove',e=>{mx=(e.clientX/innerWidth)*2-1;my=-(e.clientY/innerHeight)*2+1})
+document.addEventListener('wheel',e=>{targetZ=Math.max(3,Math.min(20,targetZ+e.deltaY*.01))})
+
+function animate(){
+  requestAnimationFrame(animate)
+  group.children.forEach(m=>{
+    m.position.x+=m.userData.vx;m.position.y+=m.userData.vy;m.position.z+=m.userData.vz
+    m.rotation.x+=m.userData.rot;m.rotation.y+=m.userData.rot*1.3
+    const r=Math.sqrt(m.position.x**2+m.position.y**2+m.position.z**2)
+    if(r>9||r<1.5){m.userData.vx*=-1;m.userData.vy*=-1;m.userData.vz*=-1}
+  })
+  group.rotation.x+=(my*.2-group.rotation.x)*.02
+  group.rotation.y+=(mx*.4-group.rotation.y)*.02
+  particles.rotation.y+=.0003
+  camera.position.z+=(targetZ-camera.position.z)*.05
+  renderer.render(scene,camera)
+}
+animate()
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)})
+</script>
+</body>
+</html>
