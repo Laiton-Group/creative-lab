@@ -6,6 +6,12 @@
 <style>
 *{margin:0;padding:0}
 body{background:#0a0a0f;overflow:hidden;font-family:monospace;cursor:default}
+#loader{position:fixed;top:0;left:0;width:100%;height:100%;z-index:20;display:flex;flex-direction:column;justify-content:center;align-items:center;background:#0a0a0f;transition:opacity .8s;pointer-events:none}
+#loader.h{opacity:0;pointer-events:none}
+#loader .r{width:28px;height:34px;margin-bottom:8px;animation:pulse 2s ease-in-out infinite}
+#loader .r svg{width:100%;height:100%}
+#loader .l{font-family:monospace;font-size:7px;letter-spacing:5px;color:rgba(255,255,255,.06);text-transform:uppercase}
+@keyframes pulse{0%,100%{transform:scale(.85);opacity:.3}50%{transform:scale(1);opacity:.7}}
 canvas{display:block}
 #ui{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none}
 #hud{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.04);font-size:8px;letter-spacing:2px;z-index:2;text-align:center;font-family:monospace}
@@ -25,6 +31,7 @@ canvas{display:block}
 </style>
 </head>
 <body>
+<div id="loader"><div class="r"><svg viewBox="0 0 60 70" fill="none"><path d="M-8,-24 C-12,-40 -9,-47 -4,-44 C0,-41 -2,-30 -3,-22Z" fill="rgba(255,255,255,.03)"/><path d="M8,-24 C12,-40 9,-47 4,-44 C0,-41 2,-30 3,-22Z" fill="rgba(255,255,255,.03)"/><ellipse cx="0" cy="-18" rx="13" ry="12" fill="rgba(255,255,255,.04)"/><path d="M-10,-8 C-13,3 -15,14 -12,25 C-9,31 -6,32 -3,32 L3,32 C6,32 9,31 12,25 C15,14 13,3 10,-8Z" fill="rgba(255,255,255,.04)"/></svg></div><div class="l">VOID</div></div>
 <canvas id="c"></canvas>
 <div id="ui">
   <div id="nav">
@@ -319,6 +326,9 @@ function checkSecrets(){
     else if(m.material.opacity>.01)m.material.opacity-=.005
   })
 }
+
+// ─── Loader ───
+setTimeout(()=>document.getElementById('loader').classList.add('h'),2000)
 
 // ─── FPS ───
 let fc=0,lf=0,fps=0
