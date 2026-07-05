@@ -19,7 +19,9 @@ canvas{display:block}
 #nav button{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.08);font-family:monospace;font-size:6px;letter-spacing:2px;padding:4px 8px;border-radius:2px;cursor:pointer;transition:.3s;text-transform:uppercase}
 #nav button:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.2)}
 #nav button.a{border-color:rgba(0,212,170,.15);color:rgba(0,212,170,.3);background:rgba(0,212,170,.03)}
-#stats{position:fixed;top:16px;right:16px;z-index:2;color:rgba(255,255,255,.03);font-size:7px;letter-spacing:1px;text-align:right;line-height:1.6;font-family:monospace;pointer-events:none}
+#music-btn{position:fixed;top:16px;right:16px;z-index:2;font-family:monospace;font-size:6px;color:rgba(255,255,255,.08);background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);padding:4px 8px;border-radius:2px;cursor:pointer;pointer-events:auto;letter-spacing:2px;text-transform:uppercase;transition:.3s}
+#music-btn:hover{border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.2)}
+#stats{position:fixed;top:16px;right:48px;z-index:2;color:rgba(255,255,255,.03);font-size:7px;letter-spacing:1px;text-align:right;line-height:1.6;font-family:monospace;pointer-events:none}
 </style>
 </head>
 <body>
@@ -37,6 +39,7 @@ canvas{display:block}
     <button data-r="echo">ECHO</button>
     <button data-r="singularity">SINGULARITY</button>
   </div>
+  <button id="music-btn">♪ music</button>
   <div id="stats"><span id="fps">0</span> FPS · <span id="obj-count">0</span> objects</div>
   <div id="hud"><div class="r" id="room-name">VOID</div><div class="s" id="room-desc">the empty space between</div></div>
   <div id="secret"><div class="t" id="st"></div><div class="h" id="sh"></div></div>
@@ -252,6 +255,16 @@ for(let i=0;i<8;i++){
   const m=new THREE.Mesh(new THREE.CylinderGeometry(.005,.05,15,3),new THREE.MeshBasicMaterial({color:0x00d4aa,transparent:true,opacity:.005,depthWrite:false}))
   const a=(i/8)*Math.PI*2;m.position.set(Math.cos(a)*4,0,Math.sin(a)*4);m.rotation.x=Math.random()*.1;world.add(m)
 }
+
+// ─── Music ───
+const vaudio=new Audio('https://lambda.vgmtreasurechest.com/soundtracks/super-mario-odyssey-original-soundtrack/ycsesdlu/4-43.%20Shiveria%20Snowscape.mp3')
+vaudio.loop=true;vaudio.volume=.15
+let vmusic=false
+document.getElementById('music-btn').addEventListener('click',()=>{
+  vmusic=!vmusic
+  if(vmusic){vaudio.play().catch(()=>{});document.getElementById('music-btn').textContent='♪ on'}
+  else{vaudio.pause();document.getElementById('music-btn').textContent='♪ music'}
+})
 
 // ─── Navigation ───
 const roomKeys=Object.keys(rooms),roomNames={void:'VOID',crystal:'CRYSTAL GARDEN',ember:'EMBER',depths:'DEPTHS',aurora:'AURORA',pillars:'PILLARS',abyss:'ABYSS',nexus:'NEXUS',echo:'ECHO',singularity:'SINGULARITY'}
