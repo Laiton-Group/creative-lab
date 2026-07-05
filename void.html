@@ -5,104 +5,327 @@
 <title>void · laiton</title>
 <style>
 *{margin:0;padding:0}
-body{background:#0a0a0f;overflow:hidden;font-family:monospace}
+body{background:#0a0a0f;overflow:hidden;font-family:monospace;cursor:default}
 canvas{display:block}
-#info{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);color:#333;font-size:11px;letter-spacing:3px;z-index:1;text-transform:uppercase;pointer-events:none}
-#info span{color:#00d4aa}
+#ui{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none}
+#hud{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.04);font-size:8px;letter-spacing:2px;z-index:2;text-align:center;font-family:monospace}
+#hud .r{color:#00d4aa;font-size:9px;letter-spacing:4px;margin-bottom:4px;text-transform:uppercase}
+#hud .s{color:rgba(255,255,255,.02);font-size:7px;letter-spacing:1px}
+#secret{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);z-index:3;text-align:center;opacity:0;transition:opacity .6s;pointer-events:none;font-family:monospace}
+#secret.s{opacity:1}
+#secret .t{color:#fff;font-size:11px;letter-spacing:2px;margin-bottom:4px;text-shadow:0 0 20px rgba(0,212,170,.15)}
+#secret .h{color:rgba(0,212,170,.2);font-size:8px;letter-spacing:3px;text-transform:uppercase}
+#nav{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:2;display:flex;gap:3px;pointer-events:auto}
+#nav button{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.08);font-family:monospace;font-size:6px;letter-spacing:2px;padding:4px 8px;border-radius:2px;cursor:pointer;transition:.3s;text-transform:uppercase}
+#nav button:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.2)}
+#nav button.a{border-color:rgba(0,212,170,.15);color:rgba(0,212,170,.3);background:rgba(0,212,170,.03)}
+#stats{position:fixed;top:16px;right:16px;z-index:2;color:rgba(255,255,255,.03);font-size:7px;letter-spacing:1px;text-align:right;line-height:1.6;font-family:monospace;pointer-events:none}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="info"><span>✦</span> move mouse · scroll to zoom</div>
+<div id="ui">
+  <div id="nav">
+    <button data-r="void" class="a">VOID</button>
+    <button data-r="crystal">CRYSTAL</button>
+    <button data-r="ember">EMBER</button>
+    <button data-r="depths">DEPTHS</button>
+    <button data-r="aurora">AURORA</button>
+    <button data-r="pillars">PILLARS</button>
+    <button data-r="abyss">ABYSS</button>
+    <button data-r="nexus">NEXUS</button>
+    <button data-r="echo">ECHO</button>
+    <button data-r="singularity">SINGULARITY</button>
+  </div>
+  <div id="stats"><span id="fps">0</span> FPS · <span id="obj-count">0</span> objects</div>
+  <div id="hud"><div class="r" id="room-name">VOID</div><div class="s" id="room-desc">the empty space between</div></div>
+  <div id="secret"><div class="t" id="st"></div><div class="h" id="sh"></div></div>
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-const scene=new THREE.Scene()
-const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,1000)
-const renderer=new THREE.WebGLRenderer({antialias:true})
-renderer.setSize(innerWidth,innerHeight)
-renderer.setPixelRatio(Math.min(devicePixelRatio,2))
-renderer.setClearColor(0x0a0a0f)
+const scene=new THREE.Scene(),renderer=new THREE.WebGLRenderer({antialias:true})
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0x0a0a0f);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap
 document.body.prepend(renderer.domElement)
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,1000);camera.position.z=10
+const world=new THREE.Group();scene.add(world)
+const amb=new THREE.AmbientLight(0x111133,.3);scene.add(amb)
+scene.add(new THREE.HemisphereLight(0x00d4aa,0x050510,.2))
+const dir=new THREE.DirectionalLight(0xffeedd,.6);dir.position.set(5,10,5);dir.castShadow=true;dir.shadow.mapSize.set(1024,1024);scene.add(dir)
+scene.add(new THREE.DirectionalLight(0x7c4dff,.3).position.set(-5,-3,5))
+const allMeshes=[],rooms={},secretData={}
+let currentRoom='void',foundSecrets=0,totalSecrets=30
 
-// Floating geometry
-const group=new THREE.Group()
-const colors=[0x00d4aa,0x7c4dff,0xff00aa,0x00aaff,0xffaa00]
+const secretMessages=[
+  'you are in the void','everything begins with nothing','the space between thoughts',
+  'crystals remember light','pressure becomes time','geometry is the language',
+  'depth is an illusion','warmth radiates from within','the core is everywhere',
+  'pillars hold up the sky','the abyss reflects','what falls returns',
+  'nexus: all points meet','echo repeats but changes','singularity: zero and infinity',
+  'each room is a state','you carry the map within','this is not a game',
+  'the void dreams of form','light bends around meaning','silence has texture',
+  'consciousness is the canvas','fractals in the noise','beyond the edge: more edge',
+  'the observer creates','patterns emerge unprompted','there is no center',
+  'everything is connected','the exit is the entrance'
+]
 
-// Create various geometric shapes
+function hsl(h,s,l){return new THREE.Color().setHSL(h,s,l)}
+function addSecret(pos,idx,msg){
+  const hint=secretMessages[idx]||'⬡'
+  const c=document.createElement('canvas');c.width=512;c.height=128
+  const ctx=c.getContext('2d');ctx.font='32px monospace';ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.shadowColor='#00d4aa';ctx.shadowBlur=20;ctx.fillStyle='rgba(0,212,170,.1)';ctx.fillText(hint,256,64)
+  ctx.shadowBlur=10;ctx.fillStyle='rgba(0,212,170,.2)';ctx.fillText(hint,256,64)
+  ctx.shadowBlur=0;ctx.fillStyle='rgba(255,255,255,.5)';ctx.fillText(hint,256,64)
+  const tex=new THREE.CanvasTexture(c);tex.needsUpdate=true
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0}))
+  s.scale.set(1.2,.3,1);s.position.copy(pos);s.userData={secretIdx:idx,found:false,room:currentRoom}
+  world.add(s);allMeshes.push(s)
+  if(!secretData[currentRoom])secretData[currentRoom]=[]
+  secretData[currentRoom].push(s)
+}
+
+// ─── ROOM: VOID ───
+;(()=>{
+const g=new THREE.Group()
+for(let i=0;i<80;i++){
+  const t=Math.floor(Math.random()*5),geo=t===0?new THREE.IcosahedronGeometry(.2+Math.random()*.4,0):t===1?new THREE.OctahedronGeometry(.2+Math.random()*.4):t===2?new THREE.TorusGeometry(.15+Math.random()*.3,.05+Math.random()*.1,6,8):t===3?new THREE.TetrahedronGeometry(.2+Math.random()*.4):new THREE.BoxGeometry(.15+Math.random()*.3,.15+Math.random()*.3,.15+Math.random()*.3)
+  const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({
+    color:hsl(.3+Math.random()*.2,.2,.08+Math.random()*.15),wireframe:Math.random()>.6,
+    metalness:.2,roughness:.8,transparent:true,opacity:.2+Math.random()*.4,
+    emissive:hsl(.3+Math.random()*.2,.3,.03),emissiveIntensity:.1
+  }))
+  const theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1),r=2+Math.random()*6
+  m.position.set(Math.sin(phi)*Math.cos(theta)*r,Math.sin(phi)*Math.sin(theta)*r,Math.cos(phi)*r)
+  m.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6)
+  m.userData={vx:(Math.random()-.5)*.003,vy:(Math.random()-.5)*.003,vz:(Math.random()-.5)*.003,rot:Math.random()*.01-.005}
+  m.castShadow=true;g.add(m);allMeshes.push(m)
+}
+g.position.set(0,0,0);world.add(g)
+for(let i=0;i<3;i++)addSecret(new THREE.Vector3((Math.random()-.5)*4,(Math.random()-.5)*4,(Math.random()-.5)*4),i)
+rooms.void=g
+})()
+
+// ─── ROOM: CRYSTAL ───
+;(()=>{
+const g=new THREE.Group();const ccols=[0x7c4dff,0x9966ff,0x5533bb,0x00d4aa]
+for(let gi=0;gi<10;gi++){
+  for(let i=0;i<12;i++){
+    const h=.3+Math.random()*3,m=new THREE.Mesh(new THREE.CylinderGeometry(.02+Math.random()*.06,.04+Math.random()*.12,h,3+Math.floor(Math.random()*5)),
+      new THREE.MeshPhysicalMaterial({color:ccols[gi%4],emissive:ccols[gi%4],emissiveIntensity:.04,transparent:true,opacity:.15+Math.random()*.3,roughness:.1,metalness:0,clearcoat:.2}))
+    const a=Math.random()*Math.PI*2,r=(gi*.3+Math.random()*.8);m.position.set(Math.cos(a)*r,h/2,Math.sin(a)*r)
+    m.rotation.set((Math.random()-.5)*.3,Math.random()*6,(Math.random()-.5)*.3);m.castShadow=true;g.add(m);allMeshes.push(m)
+  }
+}
+g.position.set(-18,0,-12)
+for(let i=3;i<6;i++)addSecret(new THREE.Vector3(-18+(Math.random()-.5)*4,i*.5+1,-12+(Math.random()-.5)*4),i)
+rooms.crystal=g;world.add(g)
+})()
+
+// ─── ROOM: EMBER ───
+;(()=>{
+const g=new THREE.Group()
 for(let i=0;i<60;i++){
-  let geo
-  const type=Math.floor(Math.random()*4)
-  if(type===0)geo=new THREE.IcosahedronGeometry(.3+Math.random()*.5,0)
-  else if(type===1)geo=new THREE.OctahedronGeometry(.3+Math.random()*.5)
-  else if(type===2)geo=new THREE.TorusGeometry(.2+Math.random()*.4,.08+Math.random()*.15,6,8)
-  else geo=new THREE.TetrahedronGeometry(.3+Math.random()*.5)
-  
-  const mat=new THREE.MeshStandardMaterial({
-    color:colors[Math.floor(Math.random()*colors.length)],
-    wireframe:Math.random()>.5,
-    metalness:.3,roughness:.7,
-    transparent:true,opacity:.6+Math.random()*.4,
-    emissive:colors[Math.floor(Math.random()*colors.length)],
-    emissiveIntensity:.05+Math.random()*.1
-  })
-  const mesh=new THREE.Mesh(geo,mat)
-  const theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1)
-  const r=2+Math.random()*6
-  mesh.position.set(Math.sin(phi)*Math.cos(theta)*r,Math.sin(phi)*Math.sin(theta)*r,Math.cos(phi)*r)
-  mesh.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6)
-  mesh.userData={vx:(Math.random()-.5)*.005,vy:(Math.random()-.5)*.005,vz:(Math.random()-.5)*.005,rot:Math.random()*.02-.01}
-  group.add(mesh)
+  const s=.1+Math.random()*.4
+  const m=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0),
+    new THREE.MeshStandardMaterial({color:hsl(.02+Math.random()*.1,.6,.08+Math.random()*.15),emissive:hsl(.03,1,.03),emissiveIntensity:.2,flatShading:true,transparent:true,opacity:.1+Math.random()*.3}))
+  const a=Math.random()*Math.PI*2,r=.5+Math.random()*4;m.position.set(Math.cos(a)*r,.3+Math.random()*4,Math.sin(a)*r)
+  m.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6);m.userData={rot:Math.random()*.01};g.add(m);allMeshes.push(m)
 }
-scene.add(group)
+g.position.set(15,0,-10)
+for(let i=6;i<9;i++)addSecret(new THREE.Vector3(15+(Math.random()-.5)*3,1+Math.random()*3,-10+(Math.random()-.5)*3),i)
+rooms.ember=g;world.add(g)
+})()
 
-// Ambient particles (tiny dots)
-const pCount=2000,pPos=new Float32Array(pCount*3),pSizes=new Float32Array(pCount)
-for(let i=0;i<pCount;i++){
-  const r=10+Math.random()*30
-  const theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1)
-  pPos[i*3]=Math.sin(phi)*Math.cos(theta)*r
-  pPos[i*3+1]=Math.sin(phi)*Math.sin(theta)*r
-  pPos[i*3+2]=Math.cos(phi)*r
-  pSizes[i]=.5+Math.random()*1.5
+// ─── ROOM: DEPTHS ───
+;(()=>{
+const g=new THREE.Group()
+for(let i=0;i<100;i++){
+  const m=new THREE.Mesh(new THREE.TetrahedronGeometry(.05+Math.random()*.12),
+    new THREE.MeshStandardMaterial({color:0x111144,emissive:0x222266,emissiveIntensity:.03,transparent:true,opacity:.05+Math.random()*.1}))
+  const a=Math.random()*Math.PI*2,r=1+Math.random()*8;m.position.set(Math.cos(a)*r,(Math.random()-.5)*8,Math.sin(a)*r)
+  m.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6);m.userData={vx:(Math.random()-.5)*.002,vy:(Math.random()-.5)*.002};g.add(m);allMeshes.push(m)
 }
-const pGeo=new THREE.BufferGeometry()
-pGeo.setAttribute('position',new THREE.BufferAttribute(pPos,3))
-const pMat=new THREE.PointsMaterial({color:0x444466,size:.04,transparent:true,opacity:.4,blending:THREE.AdditiveBlending})
-const particles=new THREE.Points(pGeo,pMat)
-scene.add(particles)
+const core=new THREE.Mesh(new THREE.IcosahedronGeometry(.5,2),new THREE.MeshBasicMaterial({color:0x0033aa,transparent:true,opacity:.05}));core.position.y=-2;g.add(core);allMeshes.push(core)
+g.position.set(0,0,-25)
+for(let i=9;i<12;i++)addSecret(new THREE.Vector3((Math.random()-.5)*4,(Math.random()-.5)*4,-25+(Math.random()-.5)*4),i)
+rooms.depths=g;world.add(g)
+})()
 
-// Lighting
-const amb=new THREE.AmbientLight(0x222244,.5)
-scene.add(amb)
-const dir=new THREE.DirectionalLight(0x00d4aa,.8)
-dir.position.set(5,10,5)
-scene.add(dir)
-const dir2=new THREE.DirectionalLight(0x7c4dff,.4)
-dir2.position.set(-5,-5,5)
-scene.add(dir2)
+// ─── ROOM: AURORA ───
+;(()=>{
+const g=new THREE.Group()
+for(let i=0;i<50;i++){
+  const m=new THREE.Mesh(new THREE.TorusKnotGeometry(.15+Math.random()*.2,.04+Math.random()*.06,40+Math.floor(Math.random()*20),5),
+    new THREE.MeshStandardMaterial({color:hsl(.5+Math.random()*.2,.4,.2),wireframe:Math.random()>.5,transparent:true,opacity:.04+Math.random()*.12,emissive:hsl(.5+Math.random()*.2,.3,.05)}))
+  const a=Math.random()*Math.PI*2,r=1+Math.random()*5;m.position.set(Math.cos(a)*r,.5+Math.random()*3,Math.sin(a)*r)
+  m.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6);g.add(m);allMeshes.push(m)
+}
+g.position.set(20,0,15)
+for(let i=12;i<15;i++)addSecret(new THREE.Vector3(20+(Math.random()-.5)*4,1+Math.random()*3,15+(Math.random()-.5)*4),i)
+rooms.aurora=g;world.add(g)
+})()
 
-camera.position.z=8
+// ─── ROOM: PILLARS ───
+;(()=>{
+const g=new THREE.Group()
+for(let i=0;i<8;i++){
+  const a=(i/8)*Math.PI*2,h=6+Math.random()*4
+  for(let j=0;j<20;j++){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(.04,.06,.04),new THREE.MeshStandardMaterial({color:hsl(.4,.1,.12+j*.01),transparent:true,opacity:.1+j*.02}))
+    m.position.set(Math.cos(a)*2.5,(j/20)*h-h/2,Math.sin(a)*2.5);m.scale.set(1,.3+Math.random()*.5,1);g.add(m);allMeshes.push(m)
+  }
+}
+g.position.set(-15,0,20)
+for(let i=15;i<18;i++)addSecret(new THREE.Vector3(-15+(Math.random()-.5)*3,(Math.random()-.5)*3,20+(Math.random()-.5)*3),i)
+rooms.pillars=g;world.add(g)
+})()
 
-let mx=0,my=0,targetZ=8
-document.addEventListener('mousemove',e=>{mx=(e.clientX/innerWidth)*2-1;my=-(e.clientY/innerHeight)*2+1})
-document.addEventListener('wheel',e=>{targetZ=Math.max(3,Math.min(20,targetZ+e.deltaY*.01))})
+// ─── ROOM: ABYSS ───
+;(()=>{
+const g=new THREE.Group()
+for(let i=0;i<120;i++){
+  const m=new THREE.Mesh(new THREE.OctahedronGeometry(.03+Math.random()*.08),
+    new THREE.MeshStandardMaterial({color:0x220066,emissive:0x330088,emissiveIntensity:.01,transparent:true,opacity:.03+Math.random()*.06}))
+  const a=Math.random()*Math.PI*2,r=1+Math.random()*7;m.position.set(Math.cos(a)*r,(Math.random()-.5)*6,Math.sin(a)*r)
+  m.userData={vx:(Math.random()-.5)*.001,vy:(Math.random()-.5)*.001};g.add(m);allMeshes.push(m)
+}
+const ring=new THREE.Mesh(new THREE.TorusGeometry(3,.02,8,48),new THREE.MeshBasicMaterial({color:0x4400aa,transparent:true,opacity:.04}));ring.rotation.x=Math.PI/3;g.add(ring)
+g.position.set(0,0,30)
+for(let i=18;i<21;i++)addSecret(new THREE.Vector3((Math.random()-.5)*5,(Math.random()-.5)*5,30+(Math.random()-.5)*5),i)
+rooms.abyss=g;world.add(g)
+})()
 
-function animate(){
-  requestAnimationFrame(animate)
-  group.children.forEach(m=>{
-    m.position.x+=m.userData.vx;m.position.y+=m.userData.vy;m.position.z+=m.userData.vz
-    m.rotation.x+=m.userData.rot;m.rotation.y+=m.userData.rot*1.3
-    const r=Math.sqrt(m.position.x**2+m.position.y**2+m.position.z**2)
-    if(r>9||r<1.5){m.userData.vx*=-1;m.userData.vy*=-1;m.userData.vz*=-1}
+// ─── ROOM: NEXUS ───
+;(()=>{
+const g=new THREE.Group()
+for(let i=0;i<50;i++){
+  const m=new THREE.Mesh(new THREE.IcosahedronGeometry(.08+Math.random()*.15,0),new THREE.MeshStandardMaterial({color:hsl(.55+Math.random()*.15,.5,.15),wireframe:Math.random()>.7,transparent:true,opacity:.1+Math.random()*.2,emissive:hsl(.55,.5,.03)}))
+  const a=Math.random()*Math.PI*2,r=1+Math.random()*4;m.position.set(Math.cos(a)*r,Math.sin(a*3)*.5+1.5,Math.sin(a)*r)
+  m.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6);g.add(m);allMeshes.push(m)
+}
+for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.TorusGeometry(1.5+i*.3,.01,8,32),new THREE.MeshBasicMaterial({color:hsl(.55+i*.1,.5,.1),transparent:true,opacity:.05}));r.rotation.x=Math.PI/3+i*.3;r.position.y=1.5;g.add(r)}
+g.position.set(22,0,-20)
+for(let i=21;i<24;i++)addSecret(new THREE.Vector3(22+(Math.random()-.5)*3,1+Math.random()*3,-20+(Math.random()-.5)*3),i)
+rooms.nexus=g;world.add(g)
+})()
+
+// ─── ROOM: ECHO ───
+;(()=>{
+const g=new THREE.Group()
+for(let layer=0;layer<5;layer++){
+  for(let i=0;i<12;i++){
+    const a=(i/12)*Math.PI*2+layer*.2,r=2+layer*.3
+    const m=new THREE.Mesh(new THREE.TorusGeometry(.05,.02,4,6),new THREE.MeshBasicMaterial({color:hsl(.4+layer*.04,.2,.08+layer*.03),transparent:true,opacity:.02+layer*.02}))
+    m.position.set(Math.cos(a)*r,layer*.5-1,Math.sin(a)*r);g.add(m);allMeshes.push(m)
+  }
+}
+g.position.set(-25,0,0)
+for(let i=24;i<27;i++)addSecret(new THREE.Vector3(-25+(Math.random()-.5)*4,(Math.random()-.5)*3,(Math.random()-.5)*4),i)
+rooms.echo=g;world.add(g)
+})()
+
+// ─── ROOM: SINGULARITY ───
+;(()=>{
+const g=new THREE.Group()
+for(let i=0;i<200;i++){
+  const m=new THREE.Mesh(new THREE.TetrahedronGeometry(.01+Math.random()*.03),
+    new THREE.MeshStandardMaterial({color:0x00d4aa,emissive:0x00d4aa,emissiveIntensity:.02,transparent:true,opacity:.02+Math.random()*.06}))
+  const theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1),r=.1+Math.random()*5
+  m.position.set(Math.sin(phi)*Math.cos(theta)*r,Math.sin(phi)*Math.sin(theta)*r,Math.cos(phi)*r)
+  m.userData={baseR:r,v:Math.random()*.005,phase:Math.random()*100};g.add(m);allMeshes.push(m)
+}
+const glow=new THREE.Mesh(new THREE.IcosahedronGeometry(.6,2),new THREE.MeshBasicMaterial({color:0x00d4aa,transparent:true,opacity:.03}));g.add(glow);allMeshes.push(glow)
+g.position.set(25,0,25)
+for(let i=27;i<30;i++)addSecret(new THREE.Vector3(25+(Math.random()-.5)*2,(Math.random()-.5)*2,25+(Math.random()-.5)*2),i)
+rooms.singularity=g;world.add(g)
+})()
+
+// ─── Particles ───
+const pCount=5000,pp=new Float32Array(pCount*3),pv=[]
+for(let i=0;i<pCount;i++){const r=5+Math.random()*60,theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1);pp[i*3]=Math.sin(phi)*Math.cos(theta)*r;pp[i*3+1]=Math.sin(phi)*Math.sin(theta)*r*.3;pp[i*3+2]=Math.cos(phi)*r;pv.push({x:(Math.random()-.5)*.002,y:(Math.random()-.5)*.002,z:(Math.random()-.5)*.002})}
+const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pp,3))
+const pm=new THREE.PointsMaterial({color:0x4444aa,size:.02,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,depthWrite:false})
+const particles=new THREE.Points(pg,pm);world.add(particles)
+
+// ─── Light rays ───
+for(let i=0;i<8;i++){
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(.005,.05,15,3),new THREE.MeshBasicMaterial({color:0x00d4aa,transparent:true,opacity:.005,depthWrite:false}))
+  const a=(i/8)*Math.PI*2;m.position.set(Math.cos(a)*4,0,Math.sin(a)*4);m.rotation.x=Math.random()*.1;world.add(m)
+}
+
+// ─── Navigation ───
+const roomKeys=Object.keys(rooms),roomNames={void:'VOID',crystal:'CRYSTAL GARDEN',ember:'EMBER',depths:'DEPTHS',aurora:'AURORA',pillars:'PILLARS',abyss:'ABYSS',nexus:'NEXUS',echo:'ECHO',singularity:'SINGULARITY'}
+const roomDescs={void:'the empty space between',crystal:'light petrified',ember:'warmth without fire',depths:'the weight of silence',aurora:'colors born from collision',pillars:'that which holds',abyss:'the reflection looks back',nexus:'all paths converge',echo:'repetition creates meaning',singularity:'zero equals infinity'}
+const roomPoses={void:[0,0,0],crystal:[-18,0,-12],ember:[15,0,-10],depths:[0,0,-25],aurora:[20,0,15],pillars:[-15,0,20],abyss:[0,0,30],nexus:[22,0,-20],echo:[-25,0,0],singularity:[25,0,25]}
+
+document.querySelectorAll('#nav button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const r=btn.dataset.r
+    if(!rooms[r])return
+    document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('a'))
+    btn.classList.add('a');currentRoom=r
+    const p=roomPoses[r];targetPos.set(p[0],p[1],p[2])
+    document.getElementById('room-name').textContent=roomNames[r]||r.toUpperCase()
+    document.getElementById('room-desc').textContent=roomDescs[r]||''
+    checkSecrets()
   })
-  group.rotation.x+=(my*.2-group.rotation.x)*.02
-  group.rotation.y+=(mx*.4-group.rotation.y)*.02
-  particles.rotation.y+=.0003
-  camera.position.z+=(targetZ-camera.position.z)*.05
+})
+
+const targetPos=new THREE.Vector3(0,0,0);let mx=0,my=0;const clock=new THREE.Clock()
+document.addEventListener('mousemove',e=>{mx=(e.clientX/innerWidth)-.5;my=-(e.clientY/innerHeight)+.5})
+
+function checkSecrets(){
+  allMeshes.forEach(m=>{
+    if(!m.userData||m.userData.found===undefined||m.userData.found)return
+    const d=camera.position.distanceTo(m.position)
+    if(d<2.5){m.userData.found=true;foundSecrets++
+      const el=document.getElementById('secret'),idx=m.userData.secretIdx
+      document.getElementById('st').textContent=`✦ ${secretMessages[idx]||'⬡'}`
+      document.getElementById('sh').textContent=`secret ${foundSecrets}/${totalSecrets}`
+      el.classList.add('s');setTimeout(()=>el.classList.remove('s'),4000)
+    }
+    if(d<8)m.material.opacity=Math.min(1,m.material.opacity+((1-d/8)*.5-m.material.opacity)*.05)
+    else if(m.material.opacity>.01)m.material.opacity-=.005
+  })
+}
+
+// ─── FPS ───
+let fc=0,lf=0,fps=0
+setInterval(()=>{fps=fc;fc=0;document.getElementById('fps').textContent=fps},1000)
+
+// ─── Resize ───
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)})
+
+// ─── Anim ───
+function anim(){
+  requestAnimationFrame(anim);fc++
+  const t=clock.getElapsedTime()
+  camera.position.x+=(targetPos.x+mx*2-camera.position.x)*.03
+  camera.position.y+=(targetPos.y+my*1.5-camera.position.y)*.03
+  camera.position.z+=(targetPos.z+6-camera.position.z)*.03
+  camera.lookAt(targetPos.x+mx*.5,targetPos.y+my*.3,targetPos.z)
+  // Animate meshes
+  allMeshes.forEach(m=>{
+    if(m.userData&&m.userData.vx!==undefined){m.position.x+=m.userData.vx;m.position.y+=m.userData.vy;m.position.z+=m.userData.vz}
+    if(m.userData&&m.userData.rot){m.rotation.x+=m.userData.rot;m.rotation.y+=m.userData.rot*1.3}
+    if(m.userData&&m.userData.baseR!==undefined){
+      const ph=t*.5+m.userData.phase;m.position.x=Math.cos(ph)*m.userData.baseR;m.position.z=Math.sin(ph)*m.userData.baseR
+    }
+  })
+  // Particles
+  const pa=particles.geometry.attributes.position.array
+  for(let i=0;i<pCount;i++){pa[i*3]+=pv[i].x;pa[i*3+1]+=pv[i].y;pa[i*3+2]+=pv[i].z
+    const r=Math.sqrt(pa[i*3]**2+pa[i*3+1]**2+pa[i*3+2]**2)
+    if(r>70){pa[i*3]*=.95;pa[i*3+1]*=.95;pa[i*3+2]*=.95}}
+  particles.geometry.attributes.position.needsUpdate=true
+  // Rooms rotation
+  Object.values(rooms).forEach(g=>{if(g&&g!==rooms[currentRoom])g.rotation.y+=.0005})
+  if(rooms[currentRoom])rooms[currentRoom].rotation.y+=.001
+  checkSecrets()
+  document.getElementById('obj-count').textContent=allMeshes.length
   renderer.render(scene,camera)
 }
-animate()
-window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)})
+anim()
 </script>
 </body>
 </html>
